@@ -14,15 +14,6 @@ import gwt.{type Jwt, type JwtDecodeError, type Verified}
 
 import mist.{type Connection, type ResponseData}
 
-// pub fn main() {
-//   io.println("Hello from tetrolith!")
-//   let assert Ok(actor) = actor.start([], handle_message)
-// }
-// // fn handle_message(
-// //  message: Message(e),
-// //  stack: List(e),
-// // ) -> actor.Next(Message(e), List(e)) {
-
 pub fn main() {
   let not_found =
     response.new(404)
