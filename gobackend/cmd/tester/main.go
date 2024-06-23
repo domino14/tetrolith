@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -18,10 +19,12 @@ import (
 	"aerolith.org/tetrolith/pkg/game"
 )
 
+const BotTimeInterval = 2 * time.Second
+
 type model struct {
 	textInput textinput.Model
 	mgr       *game.GameStateManager
-	mgrstate  string
+	mgrstate  []byte
 }
 
 func (m model) Init() tea.Cmd {
@@ -29,8 +32,10 @@ func (m model) Init() tea.Cmd {
 }
 
 type refreshMsg struct {
-	newMgrState string
+	newMgrState []byte
 }
+
+type botGuessMsg struct{}
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -56,6 +61,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case refreshMsg:
 		m.mgrstate = msg.newMgrState
 		return m, nil
+
+	case botGuessMsg:
+		gsm := &game.GameStateManager{}
+		err := json.Unmarshal(m.mgrstate, gsm)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(gsm.Boards) >= 2 && gsm.Boards[1] != nil {
+			guess := gsm.Boards[1].RandomWord(true)
+			m.mgr.Boards[1].Guess(guess)
+		}
 	}
 	m.textInput, cmd = m.textInput.Update(msg)
 
@@ -63,7 +80,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return fmt.Sprintf("%s\n\n%s\n\n", m.mgrstate, m.textInput.View())
+	gsm := &game.GameStateManager{}
+	err := json.Unmarshal(m.mgrstate, gsm)
+	if err != nil {
+		panic(err)
+	}
+	ptbl := gsm.Printable()
+	return fmt.Sprintf("%s\n\n%s\n\n", ptbl, m.textInput.View())
 }
 
 func initialModel(mgr *game.GameStateManager) model {
@@ -75,7 +98,7 @@ func initialModel(mgr *game.GameStateManager) model {
 
 	return model{
 		textInput: ti,
-		mgrstate:  "",
+		mgrstate:  []byte("{}"),
 		mgr:       mgr,
 	}
 }
@@ -102,7 +125,7 @@ func main() {
 	searchparam2 := &wordsearcher.SearchRequest_SearchParam{
 		Condition: wordsearcher.SearchRequest_LENGTH,
 		Conditionparam: &wordsearcher.SearchRequest_SearchParam_Minmax{
-			Minmax: &wordsearcher.SearchRequest_MinMax{Min: 8, Max: 8},
+			Minmax: &wordsearcher.SearchRequest_MinMax{Min: 7, Max: 8},
 		},
 	}
 
@@ -115,15 +138,15 @@ func main() {
 		panic(err)
 	}
 
-	stateOut := make(chan string)
-	mgr, err := game.NewGameStateManager(string(bts), cfg.WordDBServerAddress, shortuuid.New(),
+	stateOut := make(chan []byte)
+	mgr := game.NewGameStateManager(bts, []string{"us", "bot"}, cfg.WordDBServerAddress,
+		shortuuid.New(),
 		stateOut, game.CryptoSeed())
-	if err != nil {
-		panic(err)
-	}
 	p := tea.NewProgram(initialModel(mgr))
 
-	botTimer := time.NewTicker(3 * time.Second)
+	mgr.StartGameCountdown()
+
+	botTimer := time.NewTicker(BotTimeInterval)
 
 	go func() {
 		for {
@@ -132,8 +155,7 @@ func main() {
 
 				p.Send(refreshMsg{state})
 			case <-botTimer.C:
-				mgr.Boards[1].GuessRandomWord()
-
+				p.Send(botGuessMsg{})
 			}
 		}
 	}()

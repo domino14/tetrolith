@@ -1,18 +1,27 @@
 package sockets
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
 
 	"aerolith.org/tetrolith/pkg/config"
+	"aerolith.org/tetrolith/pkg/game"
 )
 
 const ConnPollPeriod = 60 * time.Second
+
+// A BroadcastMessage gets sent to all connected users.
+type BroadcastMessage struct {
+	msg []byte
+}
 
 // A UserMessage is a message that should be sent to a user.
 type UserMessage struct {
@@ -41,20 +50,27 @@ type Hub struct {
 	// Unregister requests from clients.
 	unregister chan *Client
 
+	broadcast       chan BroadcastMessage
 	broadcastUser   chan UserMessage
 	sendConnMessage chan ConnMessage
+
+	gameSessionManager *game.SessionManager
+	gameEventsOut      chan []byte
 }
 
 func NewHub(cfg *config.Config) (*Hub, error) {
-
+	gevents := make(chan []byte, 32)
 	return &Hub{
 		// broadcast:         make(chan []byte),
-		broadcastUser:     make(chan UserMessage),
-		sendConnMessage:   make(chan ConnMessage),
-		register:          make(chan *Client),
-		unregister:        make(chan *Client),
-		clientsByUsername: make(map[string]map[*Client]bool),
-		clientsByConnID:   make(map[string]*Client),
+		broadcastUser:      make(chan UserMessage),
+		sendConnMessage:    make(chan ConnMessage),
+		broadcast:          make(chan BroadcastMessage),
+		register:           make(chan *Client),
+		unregister:         make(chan *Client),
+		clientsByUsername:  make(map[string]map[*Client]bool),
+		clientsByConnID:    make(map[string]*Client),
+		gameSessionManager: game.NewSessionManager(cfg, gevents),
+		gameEventsOut:      gevents,
 	}, nil
 }
 
@@ -69,7 +85,7 @@ func (h *Hub) addClient(client *Client) error {
 	h.clientsByUsername[client.username][client] = true
 	h.clientsByConnID[client.connID] = client
 
-	return nil
+	return h.sendInitInfo(client)
 }
 
 func (h *Hub) removeClient(c *Client) error {
@@ -138,6 +154,15 @@ func (h *Hub) Run() {
 				}
 			}
 
+		case message := <-h.broadcast:
+			for _, client := range h.clientsByConnID {
+				select {
+				case client.send <- message.msg:
+				default:
+					h.removeClient(client)
+				}
+			}
+
 		case message := <-h.sendConnMessage:
 			c, ok := h.clientsByConnID[message.connID]
 			if !ok {
@@ -155,6 +180,24 @@ func (h *Hub) Run() {
 		case <-ticker.C:
 			log.Info().Int("num-conns", len(h.clientsByConnID)).
 				Int("num-users", len(h.clientsByUsername)).Msg("conn-stats")
+
+		case message := <-h.gameEventsOut:
+			// Event from a game. Send to appropriate sockets.
+			gsm := &game.GameStateManager{}
+			err := json.Unmarshal(message, gsm)
+			if err != nil {
+				log.Err(err).Msg("unmarshalling-state")
+			}
+			for _, p := range gsm.Players {
+				for client := range h.clientsByUsername[p] {
+					select {
+					case client.send <- message:
+					default:
+						log.Debug().Str("connID", client.connID).Msg("in gevtsout, remove")
+						h.removeClient(client)
+					}
+				}
+			}
 		}
 	}
 }
@@ -173,7 +216,7 @@ func (h *Hub) socketLogin(c *Client) error {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		c.username, ok = claims["usn"].(string)
 		if !ok {
-			return errors.New("malformed token - unn")
+			return errors.New("malformed token - usn")
 		}
 		log.Debug().Str("username", c.username).Msg("socket connection")
 	}
@@ -184,4 +227,103 @@ func (h *Hub) socketLogin(c *Client) error {
 		return errors.New("invalid token")
 	}
 	return err
+}
+
+type SeekMsg struct {
+	SearchCriteria json.RawMessage
+	ListName       string
+}
+
+type GuessMsg struct {
+	Gid   string
+	Guess string
+}
+
+func (h *Hub) parseAndExecuteMessage(ctx context.Context, message []byte, c *Client) error {
+	tp, pl, _ := bytes.Cut(message, []byte(" "))
+	cmd := string(bytes.TrimSpace(tp))
+	payload := string(bytes.TrimSpace(pl))
+	switch cmd {
+	case "SEEK": // SEEK json
+		seekMsg := &SeekMsg{}
+		err := json.Unmarshal(pl, seekMsg)
+		if err != nil {
+			return err
+		}
+		sess, err := h.gameSessionManager.Seek(c.username, seekMsg.ListName, seekMsg.SearchCriteria)
+		if err != nil {
+			return err
+		}
+		// broadcast seek
+		var sk bytes.Buffer
+		sk.WriteString("SEEK ")
+		sjson, err := json.Marshal(sess)
+		if err != nil {
+			return err
+		}
+		sk.WriteString(string(sjson))
+		h.broadcast <- BroadcastMessage{msg: sk.Bytes()}
+	case "JOIN":
+		_, err := h.gameSessionManager.Join(c.username, payload)
+		if err != nil {
+			return err
+		}
+		// broadcast join
+		var sk bytes.Buffer
+		sk.WriteString("JOIN ")
+		sk.WriteString(c.username)
+		sk.WriteString(" ")
+		sk.WriteString(payload)
+		h.broadcast <- BroadcastMessage{msg: sk.Bytes()}
+	case "UNSEEK":
+		err := h.gameSessionManager.Unseek(c.username)
+		if err != nil {
+			return err
+		}
+		// broadcast unseek
+		var sk bytes.Buffer
+		sk.WriteString("UNSEEK ")
+		sk.WriteString(c.username)
+		h.broadcast <- BroadcastMessage{msg: sk.Bytes()}
+	case "SOLVE":
+		guessMsg := &GuessMsg{}
+		err := json.Unmarshal(pl, guessMsg)
+		if err != nil {
+			return err
+		}
+		err = h.gameSessionManager.SendGuess(c.username, guessMsg.Gid, guessMsg.Guess)
+		if err != nil {
+			return err
+		}
+
+	case "CHAT":
+
+	case "LEAVE":
+		err := h.gameSessionManager.Leave(c.username, payload)
+		if err != nil {
+			return err
+		}
+		// broadcast leave
+		var sk bytes.Buffer
+		sk.WriteString("LEAVE ")
+		sk.WriteString(c.username)
+		sk.WriteString(" ")
+		sk.WriteString(payload)
+		h.broadcast <- BroadcastMessage{msg: sk.Bytes()}
+	default:
+		return errors.New("badly formatted message")
+	}
+	return nil
+}
+
+func (h *Hub) sendInitInfo(client *Client) error {
+	sessions, err := h.gameSessionManager.AllSessions()
+	if err != nil {
+		return err
+	}
+	sessionsMsg := []byte("SESSIONS ")
+	sessionsMsg = append(sessionsMsg, sessions...)
+
+	client.send <- sessionsMsg
+	return nil
 }

@@ -2,12 +2,14 @@ package game
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/domino14/word_db_server/rpc/wordsearcher"
@@ -20,27 +22,32 @@ type Status int
 const (
 	Countdown Status = iota
 	Playing
+	PermanentlyOver
 )
 
 const TotalNumQuestions = 50
-const NumSlots = 15
+const NumSlots = 16
 const TickDuration = 1 * time.Second
 const OppTickDuration = 3 * time.Second
-const GameCountdownTime = 2 * time.Second
+const InitGameCountdownTime = 2 * time.Second
+const NextGameCountdownTime = 10 * time.Second
 
 type GameStateManager struct {
 	ID             string
 	Status         Status
 	timer          *time.Timer
-	Boards         [2]*GameBoard
-	questionOffset int
-	questions      []*wordsearcher.Alphagram
+	Boards         []*GameBoard
+	Players        []string
+	QuestionOffset int
 	stop           chan struct{}
 	stateChange    chan struct{}
 	addToOppQueue  chan *Question
-	randSeed       int
-	randomizer     *rand.Rand
-	stateOut       chan string
+	randSeed       [32]byte
+	stateOut       chan []byte
+	wdbServer      string
+	SearchCriteria []byte
+	boardexited    chan int
+	exitedboards   []bool
 }
 
 type BoardStatus int
@@ -48,9 +55,39 @@ type BoardStatus int
 const (
 	PieceDropping BoardStatus = iota
 	PieceAboutToDrop
+	PlayerQueueEmpty
 )
 
+// State changes are important to keep track of for animation purposes.
+type StateChangeType string
+
+const (
+	// PieceFall is when a single piece falls one slot
+	PieceFall StateChangeType = "piecefall"
+	// PieceLand is when a piece lands at the lowest possible point
+	PieceLand StateChangeType = "pieceland"
+	// StackRise is when our stack goes up, usually because of opponent pieces
+	StackRise StateChangeType = "stackrise"
+	// StackQueue is when our stack is queued to go up, usually because of opponent pieces
+	StackQueue StateChangeType = "stackqueue"
+	// FullySolveQuestion is when we solve a question
+	FullySolveQuestion StateChangeType = "fullysolvequestion"
+
+	Lost StateChangeType = "lost"
+)
+
+// A StateChange should be sent to the display front-end along with the full state.
+// This will allow the front-end to animate changes.
+type StateChange struct {
+	ChangeType    StateChangeType
+	PayloadNum    int
+	PayloadNum2   int
+	PayloadString string
+}
+
 type GameBoard struct {
+	sync.Mutex
+
 	// Slots go from top to bottom.
 	Slots [NumSlots]*Question // alphagrams
 	// Each board should have its own independent timer
@@ -62,117 +99,164 @@ type GameBoard struct {
 	guessEvents   chan string
 	Dead          bool
 	Won           bool
-	idx           int
+	Idx           int
 	oppqueueReady bool
 	Solved        int
+	quitting      bool
 
-	oppQueueChan chan *Question
-	manager      *GameStateManager
-	stop         chan struct{}
-	status       BoardStatus
+	oppQueueChan    chan *Question
+	manager         *GameStateManager
+	stop            chan struct{}
+	status          BoardStatus
+	LastStateChange StateChange
 }
 
 type Question struct {
-	origquestion *wordsearcher.Alphagram
-	whose        int // index in players
-	answermap    map[string]bool
+	OrigQuestion *wordsearcher.Alphagram
+	Whose        int // index in players
+	AnswerMap    map[string]bool
 }
 
 func (a *Question) populateMap() {
-	a.answermap = map[string]bool{}
-	for _, answer := range a.origquestion.Words {
-		a.answermap[strings.ToLower(answer.Word)] = true
+	a.AnswerMap = map[string]bool{}
+	for _, answer := range a.OrigQuestion.Words {
+		a.AnswerMap[strings.ToLower(answer.Word)] = true
 	}
 }
 
 func (a *Question) answersLeft() int {
-	return len(a.answermap)
+	return len(a.AnswerMap)
 }
 
-func NewGameStateManager(searchCriteria, wdbServer, ID string, stateout chan string, randseed [32]byte) (*GameStateManager, error) {
-	s := wordsearcher.NewQuestionSearcherProtobufClient(wdbServer, &http.Client{})
+func NewGameStateManager(searchCriteria []byte, players []string, wdbServer, ID string, stateout chan []byte,
+	randseed [32]byte) *GameStateManager {
+
+	gs := &GameStateManager{
+		Status:         Countdown,
+		stateChange:    make(chan struct{}, 1),
+		Players:        players,
+		ID:             ID,
+		stateOut:       stateout,
+		addToOppQueue:  make(chan *Question, 8),
+		wdbServer:      wdbServer,
+		SearchCriteria: searchCriteria,
+		randSeed:       randseed,
+		boardexited:    make(chan int),
+	}
+
+	return gs
+}
+
+func (gs *GameStateManager) start() error {
+	// reseed randomizer with the same seed so shuffle is deterministic.
+	randomizer := rand.New(rand.NewChaCha8(gs.randSeed))
+	gs.exitedboards = make([]bool, len(gs.Players))
+	s := wordsearcher.NewQuestionSearcherProtobufClient(gs.wdbServer, &http.Client{})
 	sr := &wordsearcher.SearchRequest{}
-	err := protojson.Unmarshal([]byte(searchCriteria), sr)
+	err := protojson.Unmarshal(gs.SearchCriteria, sr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	resp, err := s.Search(context.Background(), sr)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(resp.Alphagrams) < TotalNumQuestions {
-		return nil, errors.New("too few questions")
-	}
-	// split them equally
-	if len(resp.Alphagrams)%2 == 1 {
-		resp.Alphagrams = resp.Alphagrams[:len(resp.Alphagrams)-1]
+		return err
 	}
 
 	// start a game
-	gs := &GameStateManager{
-		Status:        Countdown,
-		questions:     resp.Alphagrams,
-		stateChange:   make(chan struct{}, 1),
-		ID:            ID,
-		stateOut:      stateout,
-		addToOppQueue: make(chan *Question, 8),
-	}
-	gs.randomizer = rand.New(rand.NewChaCha8(randseed))
-	gs.Boards[0] = newGameBoard(0, gs)
-	gs.Boards[1] = newGameBoard(1, gs)
 
-	gs.randomizer.Shuffle(len(resp.Alphagrams),
+	randomizer.Shuffle(len(resp.Alphagrams),
 		func(i, j int) {
 			resp.Alphagrams[i], resp.Alphagrams[j] = resp.Alphagrams[j], resp.Alphagrams[i]
 		})
 
-	for idx, alph := range resp.Alphagrams[:TotalNumQuestions] {
+	if len(resp.Alphagrams)-gs.QuestionOffset < TotalNumQuestions {
+		return errors.New("too few questions left")
+	}
+
+	resp.Alphagrams = resp.Alphagrams[gs.QuestionOffset : gs.QuestionOffset+TotalNumQuestions]
+	// Re-initialize boards.
+	gs.Boards = make([]*GameBoard, len(gs.Players))
+	for i := range gs.Players {
+		gs.Boards[i] = newGameBoard(i, gs)
+	}
+
+	for idx, alph := range resp.Alphagrams {
 		whose := idx % 2
 		q := &Question{
-			origquestion: alph,
-			whose:        whose,
+			OrigQuestion: alph,
+			Whose:        whose,
 		}
 		// It's already an alphagram, but we want to make sure we sort by rune consistently
 		// for both guesses and alphagrams.
-		q.origquestion.Alphagram = alphagrammize(q.origquestion.Alphagram)
+		q.OrigQuestion.Alphagram = alphagrammize(q.OrigQuestion.Alphagram)
 		q.populateMap()
 		gs.Boards[whose].Queue = append(gs.Boards[whose].Queue, q)
 	}
+	gs.QuestionOffset += TotalNumQuestions
 
-	gs.startGameCountdown()
+	// Actually start game
+	for i := range gs.Boards {
+		gs.Boards[i].Tick()
+	}
+	for i := range gs.Boards {
+		go gs.Boards[i].loop()
+	}
 
-	return gs, nil
+	gs.Status = Playing
+	gs.stateChange <- struct{}{}
+
+	return nil
 }
 
-func (gs *GameStateManager) startGameCountdown() {
+func (gs *GameStateManager) TryDestroy() error {
+	if gs.Status != Countdown {
+		return errors.New("cannot destroy an ongoing game")
+	}
+	gs.Stop()
+	for _, b := range gs.Boards {
+		b.Quit()
+	}
+	return nil
+}
+
+func (gs *GameStateManager) StartGameCountdown() {
 	// start timer
-	gs.timer = time.NewTimer(GameCountdownTime)
+	gs.timer = time.NewTimer(InitGameCountdownTime)
 	go gs.Loop()
 }
 
+func (gs *GameStateManager) Guess(username, guess string) error {
+	found := false
+	for i := range gs.Players {
+		if gs.Players[i] == username {
+			found = true
+			gs.Boards[i].Guess(guess)
+			break
+		}
+	}
+	if !found {
+		return errors.New("player is not in this game")
+	}
+	return nil
+}
+
 func (gs *GameStateManager) Loop() {
-	log.Debug().Str("id", gs.ID).Msg("start game state manager loop")
+	log.Info().Str("gid", gs.ID).Msg("start game state manager loop")
 gloop:
 	for {
 		select {
 		case <-gs.timer.C:
-			log.Debug().Str("id", gs.ID).Msg("timer tick")
 			if gs.Status == Countdown {
-				// Actually start game
-				gs.Boards[0].Tick()
-				gs.Boards[1].Tick()
-
-				go gs.Boards[0].loop()
-				go gs.Boards[1].loop()
-
-				gs.Status = Playing
-				gs.stateChange <- struct{}{}
+				err := gs.start()
+				if err != nil {
+					log.Err(err).Msg("start-error")
+					break gloop
+				}
 			}
 
 		case alph := <-gs.addToOppQueue:
-			opp := 1 - alph.whose // if 0, then 1, else if 1 then 0
+			opp := 1 - alph.Whose // if 0, then 1, else if 1 then 0
 			gs.Boards[opp].oppQueueChan <- alph
 
 		case <-gs.stop:
@@ -180,25 +264,53 @@ gloop:
 
 		case <-gs.stateChange:
 			// Send out game state to sockets! Print out, etc. stop the game if needed.
-			gs.stateOut <- gs.Printable()
-			if gs.Boards[0].Won || gs.Boards[0].Dead || gs.Boards[1].Won || gs.Boards[1].Dead {
-				gs.Boards[0].Quit()
-				gs.Boards[1].Quit()
-				break gloop
+			for i := range gs.Boards {
+				gs.Boards[i].Lock()
+			}
+			gs.stateOut <- gs.Marshal()
+			for i := range gs.Boards {
+				gs.Boards[len(gs.Boards)-1-i].Unlock()
+			}
+
+		case idx := <-gs.boardexited:
+			gs.exitedboards[idx] = true
+			allquit := true
+			for i := range gs.exitedboards {
+				if !gs.exitedboards[i] {
+					allquit = false
+					break
+				}
+			}
+			if allquit {
+				gs.timer = time.NewTimer(NextGameCountdownTime)
+				gs.Status = Countdown
+			} else {
+				for i := range gs.Boards {
+					if i != idx {
+						gs.Boards[i].shouldQuitSoon()
+					}
+				}
 			}
 		}
 	}
-	log.Info().Str("id", gs.ID).Msg("leaving manager loop")
+	gs.Status = PermanentlyOver
+	gs.stateOut <- gs.Marshal()
+	log.Info().Str("gid", gs.ID).Msg("leaving manager loop")
 
+}
+
+func (gs *GameStateManager) Stop() {
+	gs.stop <- struct{}{}
 }
 
 func newGameBoard(idx int, gs *GameStateManager) *GameBoard {
 	gb := &GameBoard{
-		idx:          idx,
+		Idx:          idx,
 		fallerPos:    -1,
 		guessEvents:  make(chan string, 5),
 		oppQueueChan: make(chan *Question, 5),
 		manager:      gs,
+		stop:         make(chan struct{}),
 	}
 	gb.OppQueueTimer = time.NewTimer(0)
 	// We can't construct a timer in Go without starting it, so start and stop the opp queue timer.
@@ -210,7 +322,7 @@ func newGameBoard(idx int, gs *GameStateManager) *GameBoard {
 }
 
 func (gb *GameBoard) loop() {
-	log.Debug().Int("idx", gb.idx).Msg("start game board loop")
+	log.Debug().Int("idx", gb.Idx).Msg("start game board loop")
 	gb.status = PieceDropping
 gbloop:
 	for {
@@ -219,23 +331,40 @@ gbloop:
 			gb.Tick()
 			gb.manager.stateChange <- struct{}{}
 
+			gb.Lock()
+			if gb.Won || gb.Dead || gb.quitting {
+				gb.Unlock()
+				break gbloop
+			}
+			gb.Unlock()
+
 		case <-gb.OppQueueTimer.C:
 			// Opp queue is now ready to be added to game board. It will
 			// be added as soon as the next piece drops.
 			gb.SetOppQueueReady()
 
 		case evt := <-gb.guessEvents:
-			log.Debug().Int("idx", gb.idx).Str("event", evt).Msg("event")
+			log.Debug().Int("idx", gb.Idx).Str("event", evt).Msg("event")
 			if gb.handleGuessEvent(evt) {
 				gb.manager.stateChange <- struct{}{}
 			}
+			gb.Lock()
+			if gb.Won || gb.Dead {
+				gb.Unlock()
+				break gbloop
+			}
+			gb.Unlock()
 
 		case alph := <-gb.oppQueueChan:
+
+			gb.Lock()
 			startTimer := false
 			if len(gb.OppQueue) == 0 {
 				startTimer = true
 			}
 			gb.OppQueue = append(gb.OppQueue, alph)
+			gb.Unlock()
+
 			gb.manager.stateChange <- struct{}{}
 			if startTimer {
 				gb.OppQueueTimer = time.NewTimer(OppTickDuration)
@@ -245,8 +374,17 @@ gbloop:
 			break gbloop
 		}
 	}
-	log.Debug().Int("idx", gb.idx).Msg("leave game board loop")
+	gb.OppQueueTimer.Stop()
+	gb.Timer.Stop()
+	gb.manager.boardexited <- gb.Idx
+	log.Debug().Int("idx", gb.Idx).Msg("leave game board loop")
 
+}
+
+func (gb *GameBoard) shouldQuitSoon() {
+	gb.Lock()
+	gb.quitting = true
+	gb.Unlock()
 }
 
 // topOfStack is the topmost slot idx that is occupied (or, if the board is empty, NumSlots)
@@ -261,13 +399,14 @@ func (gb *GameBoard) topOfStack() int {
 }
 
 func (gb *GameBoard) Quit() {
-	gb.OppQueueTimer.Stop()
-	gb.Timer.Stop()
 	gb.stop <- struct{}{}
+	log.Debug().Str("gid", gb.manager.ID).Int("board-idx", gb.Idx).Msg("gb-quitting")
 }
 
 // Tick advances the board.
 func (gb *GameBoard) Tick() {
+	gb.Lock()
+	defer gb.Unlock()
 	var topOfStack int
 	if gb.status == PieceDropping {
 
@@ -276,6 +415,7 @@ func (gb *GameBoard) Tick() {
 			// This player lost - the whole stack is full?
 			log.Debug().Msg("stack-full-losing")
 			gb.Dead = true
+			gb.LastStateChange = StateChange{ChangeType: Lost}
 			return
 		}
 
@@ -285,37 +425,49 @@ func (gb *GameBoard) Tick() {
 		}
 		gb.fallerPos++
 
-	} else if gb.status == PieceAboutToDrop {
+	} else if gb.status == PieceAboutToDrop || gb.status == PlayerQueueEmpty {
 
 		if gb.oppqueueReady {
 			if len(gb.OppQueue) == 0 {
 				log.Error().Msg("oppqueue-zero-length-but-ready?")
 			} else {
-				gb.addOppQueue()
+				added := gb.addOppQueue()
 				gb.oppqueueReady = false
 				if gb.Dead {
+					gb.LastStateChange = StateChange{ChangeType: Lost}
 					return
 				}
 				// If we are adding the opp queue contents, we give the player a little breather
 				// before we drop the next piece.
 				// Note that the status remains "PieceAboutToDrop"
 				gb.Timer = time.NewTimer(TickDuration)
+				gb.LastStateChange = StateChange{ChangeType: StackRise, PayloadNum: added}
+
 				return
 			}
 
 		}
-		topOfStack = gb.topOfStack()
-		if topOfStack == 0 {
-			log.Debug().Msg("abttodrop-stack-full-losing")
-			gb.Dead = true
+		if len(gb.Queue) == 0 {
+			gb.status = PlayerQueueEmpty
+			gb.Timer = time.NewTimer(TickDuration)
 			return
+		} else {
+			topOfStack = gb.topOfStack()
+			if topOfStack == 0 {
+				log.Debug().Msg("abttodrop-stack-full-losing")
+				gb.Dead = true
+				gb.LastStateChange = StateChange{ChangeType: Lost}
+				return
+			}
+			gb.LetGoNextPiece()
+			gb.fallerPos = 0
 		}
-		gb.LetGoNextPiece()
-		gb.fallerPos = 0
 	}
 
 	if gb.fallerPos == topOfStack-1 {
 		// landed naturally.
+		gb.LastStateChange = StateChange{ChangeType: PieceLand, PayloadNum: gb.fallerPos, PayloadNum2: gb.fallerPos - 1}
+
 		if gb.fallerPos > 0 {
 			gb.Slots[gb.fallerPos-1], gb.Slots[gb.fallerPos] = gb.Slots[gb.fallerPos], gb.Slots[gb.fallerPos-1]
 		}
@@ -335,12 +487,16 @@ func (gb *GameBoard) Tick() {
 		// Player lost
 		log.Debug().Msg("no-space-for-faller-losing")
 		gb.Dead = true
+		gb.LastStateChange = StateChange{ChangeType: Lost}
+
 		return
 	} else {
 		// drop piece down a slot, it's still in the air
 		if gb.fallerPos > 0 {
 			gb.Slots[gb.fallerPos-1], gb.Slots[gb.fallerPos] = gb.Slots[gb.fallerPos], gb.Slots[gb.fallerPos-1]
 		}
+		gb.LastStateChange = StateChange{ChangeType: PieceFall, PayloadNum: gb.fallerPos, PayloadNum2: gb.fallerPos - 1}
+
 	}
 
 	// start next timer
@@ -363,7 +519,8 @@ func (gb *GameBoard) SetOppQueueReady() {
 	gb.oppqueueReady = true
 }
 
-func (gb *GameBoard) addOppQueue() {
+func (gb *GameBoard) addOppQueue() int {
+	added := 0
 	for len(gb.OppQueue) > 0 {
 
 		nextq := gb.OppQueue[0]
@@ -378,37 +535,43 @@ func (gb *GameBoard) addOppQueue() {
 			log.Debug().Msg("oppqueue-too-full-losing")
 			gb.Dead = true
 		}
+		added += 1
 	}
+	return added
 }
 
-// GuessRandomWord only used for debugging/etc
-func (gb *GameBoard) GuessRandomWord() {
+// RandomWord only used for debugging/etc
+func (gb *GameBoard) RandomWord(wrongSometimes bool) string {
 	left := []string{}
 
 	for slot, question := range gb.Slots {
 		if gb.Slots[slot] == nil {
 			continue
 		}
-		for k := range question.answermap {
+		for k := range question.AnswerMap {
 			left = append(left, k)
 		}
 	}
 	if len(left) == 0 {
-		return
+		return ""
 	}
 	g := rand.IntN(len(left))
 
 	ourguess := left[g]
-	if rand.Float32() < 0.15 {
-		ourguess = alphagrammize(ourguess) // get it wrong
-	} else if rand.Float32() < 0.45 {
-		// Don't guess at all
-		return
+	if wrongSometimes {
+		if rand.Float32() < 0.15 {
+			ourguess = alphagrammize(ourguess) // get it wrong
+		} else if rand.Float32() < (float32(0.35) - float32(len(left))/100.0) {
+			// Don't guess at all
+			return ""
+		}
 	}
-	gb.guessEvents <- ourguess
+	return ourguess
 }
 
 func (gb *GameBoard) handleGuessEvent(g string) bool {
+	gb.Lock()
+	defer gb.Unlock()
 	// for loop is fast and fine right?
 	g = strings.ToLower(strings.TrimSpace(g))
 
@@ -445,10 +608,12 @@ func (gb *GameBoard) handleGuessEvent(g string) bool {
 			// This shouldn't happen, because the piece would not have dropped?
 			log.Error().Msg("badcondition-top-of-stack-0")
 			gb.Dead = true
+			gb.LastStateChange = StateChange{ChangeType: Lost}
 			return stateChanged
 		}
 		// Drop item immediately and set short timer for next piece.
 		gb.Slots[gb.fallerPos], gb.Slots[topOfStack-1] = gb.Slots[topOfStack-1], gb.Slots[gb.fallerPos]
+		gb.LastStateChange = StateChange{ChangeType: PieceLand, PayloadNum: topOfStack - 1, PayloadNum2: gb.fallerPos}
 		gb.fallerPos = -1
 		gb.status = PieceAboutToDrop
 		gb.Timer = time.NewTimer(TickDuration / 4)
@@ -456,7 +621,7 @@ func (gb *GameBoard) handleGuessEvent(g string) bool {
 	}
 	if fullySolvedQuestion {
 		// The slot X is fully solved. if we solved a question that was meant for us, send it to the opp
-		if gb.Slots[fullySolvedSlot].whose == gb.idx {
+		if gb.Slots[fullySolvedSlot].Whose == gb.Idx {
 			q := gb.Slots[fullySolvedSlot]
 			// Repopulate the answer map for the opponent:
 			q.populateMap()
@@ -464,6 +629,7 @@ func (gb *GameBoard) handleGuessEvent(g string) bool {
 		}
 		gb.Slots[fullySolvedSlot] = nil
 		gb.Solved++
+		gb.LastStateChange = StateChange{ChangeType: FullySolveQuestion, PayloadNum: fullySolvedSlot}
 
 		if gb.fallerPos == fullySolvedSlot {
 			// If we solved the faller just return now. Set short timer for next piece.
@@ -504,20 +670,19 @@ func (gb *GameBoard) Guess(guess string) {
 
 func (gb *GameBoard) Printable() []string {
 	strarr := []string{}
-
 	strarr = append(strarr, "_____________________")
-	strarr = append(strarr, fmt.Sprintf("Board %v Dead %v Won %v", gb.idx, gb.Dead, gb.Won))
+	strarr = append(strarr, fmt.Sprintf("Board %d Dead %v Won %v", gb.Idx, gb.Dead, gb.Won))
 	// print board.
 	strarr = append(strarr, "------------------")
 	// reset := "\x1b[0m"
 	for _, s := range gb.Slots {
 		// color := "\x1b[0;31m" // red
 		if s != nil {
-			if s.whose == 1 {
+			if s.Whose == 1 {
 				// color = "\x1b[0;36m" // cyan
 			}
-			// strarr = append(strarr, fmt.Sprintf("%0s %d %-20s %0s", color, s.answersLeft(), s.origquestion.Alphagram, reset))
-			strarr = append(strarr, fmt.Sprintf("| %d %s [p%d]", s.answersLeft(), s.origquestion.Alphagram, s.whose))
+			// strarr = append(strarr, fmt.Sprintf("%0s %d %-20s %0s", color, s.answersLeft(), s.OrigQuestion.Alphagram, reset))
+			strarr = append(strarr, fmt.Sprintf("| %d %s [p%d]", s.answersLeft(), s.OrigQuestion.Alphagram, s.Whose))
 		} else {
 			strarr = append(strarr, "|                 |")
 		}
@@ -535,17 +700,17 @@ func solveQuestion(q *Question, guess string) (bool, bool, bool) {
 	fullySolved := false
 	partiallySolved := false
 	wrong := false
-	if _, ok := q.answermap[guess]; ok {
-		delete(q.answermap, guess)
+	if _, ok := q.AnswerMap[guess]; ok {
+		delete(q.AnswerMap, guess)
 		partiallySolved = true
 	} else {
-		if alphagrammize(guess) == strings.ToLower(q.origquestion.Alphagram) {
+		if alphagrammize(guess) == strings.ToLower(q.OrigQuestion.Alphagram) {
 			// Wrong guess
 			wrong = true
 		}
 	}
 
-	if partiallySolved && len(q.answermap) == 0 {
+	if partiallySolved && len(q.AnswerMap) == 0 {
 		fullySolved = true
 	}
 	return partiallySolved, fullySolved, wrong
@@ -553,13 +718,26 @@ func solveQuestion(q *Question, guess string) (bool, bool, bool) {
 
 func (gs *GameStateManager) Printable() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("ID: %s", gs.ID))
+	if len(gs.Boards) == 0 {
+		return "(Uninitialized)"
+	}
+	builder.WriteString(fmt.Sprintf("GameID: %s\n", gs.ID))
+	builder.WriteString(fmt.Sprintf("Question Offset %d\n", gs.QuestionOffset))
+
 	b0 := gs.Boards[0].Printable()
 	b1 := gs.Boards[1].Printable()
 	for i := 0; i < len(b0); i++ {
-		builder.WriteString(fmt.Sprintf("%-40s          %-45s\n", b0[i], b1[i]))
+		builder.WriteString(fmt.Sprintf("              %-40s          %-45s\n", b0[i], b1[i]))
 	}
 	return builder.String()
+}
+
+func (gs *GameStateManager) Marshal() []byte {
+	bts, err := json.Marshal(gs)
+	if err != nil {
+		panic(err)
+	}
+	return bts
 }
 
 func alphagrammize(w string) string {

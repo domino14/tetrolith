@@ -5,8 +5,8 @@ go 1.22.4
 require (
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.4
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/domino14/word_db_server v1.1.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/websocket v1.5.2
 	github.com/lithammer/shortuuid v3.0.0+incompatible
 	github.com/namsral/flag v1.7.4-pre

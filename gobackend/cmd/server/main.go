@@ -35,9 +35,11 @@ var (
 )
 
 func main() {
-
 	cfg := &config.Config{}
 	cfg.Load(os.Args[1:])
+	if cfg.WordDBServerAddress == "" {
+		panic("need word db server")
+	}
 	log.Info().Interface("config", cfg).
 		Str("build-date", BuildDate).Str("build-hash", BuildHash).Msg("started")
 

@@ -3,9 +3,7 @@
 package sockets
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -153,7 +151,7 @@ func (c *Client) readPump() {
 		// Here is where we parse the message and send something off to the hub
 		// potentially.
 
-		err = parseAndExecuteMessage(context.Background(), message, c)
+		err = c.hub.parseAndExecuteMessage(context.Background(), message, c)
 		if err != nil {
 			log.Err(err).Str("username", c.username).Msg("parse-and-execute-message")
 			c.sendError(err)
@@ -189,7 +187,7 @@ func (c *Client) writePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.BinaryMessage)
+			w, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
@@ -271,24 +269,4 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 	go client.readPump()
 	log.Debug().Str("connID", client.connID).Msg("leaving-servews")
-}
-
-func parseAndExecuteMessage(ctx context.Context, message []byte, c *Client) error {
-	tp, payload, found := bytes.Cut(message, []byte(": "))
-	if found == false {
-		return errors.New("badly formatted message")
-	}
-	switch string(tp) {
-	case "SEEK":
-
-	case "JOIN":
-
-	case "UNSEEK":
-
-	case "SOLVE":
-
-	case "CHAT":
-
-	}
-	return nil
 }
