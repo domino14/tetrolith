@@ -121,7 +121,6 @@ func (s *SessionManager) Join(joiner, id string) (*GameSession, error) {
 	gs.GameManager = NewGameStateManager(gs.SearchCriteria, gs.Players,
 		s.cfg.WordDBServerAddress, id, s.eventsOut, CryptoSeed())
 	gs.GameManager.StartGameCountdown()
-	// XXX: quit cleanly
 
 	s.SessionsForPlayer[joiner] = gs
 	return gs, nil

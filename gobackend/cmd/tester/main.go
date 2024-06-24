@@ -137,6 +137,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(string(bts))
 
 	stateOut := make(chan []byte)
 	mgr := game.NewGameStateManager(bts, []string{"us", "bot"}, cfg.WordDBServerAddress,

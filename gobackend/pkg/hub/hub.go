@@ -213,6 +213,9 @@ func (h *Hub) socketLogin(c *Client) error {
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
+	if err != nil {
+		return err
+	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		c.username, ok = claims["usn"].(string)
 		if !ok {
