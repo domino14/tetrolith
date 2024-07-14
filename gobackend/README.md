@@ -1,1 +1,0 @@
-Reference implementation for a Go backend. This was supposed to be all gleam but I'm much faster at Go for now.

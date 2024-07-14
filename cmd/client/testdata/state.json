@@ -1,0 +1,836 @@
+{
+    "ID": "k4er6ekxK3CTek4WHFDiEF",
+    "Status": 1,
+    "Boards": [
+        {
+            "Slots": [
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                {
+                    "OrigQuestion": {
+                        "alphagram": "DFHILSU",
+                        "words": [
+                            {
+                                "word": "DISHFUL"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "dishful": true
+                    }
+                },
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ABCELORT",
+                        "words": [
+                            {
+                                "word": "BROCATEL"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "brocatel": true
+                    }
+                }
+            ],
+            "Queue": [
+                {
+                    "OrigQuestion": {
+                        "alphagram": "DHIOPSTY",
+                        "words": [
+                            {
+                                "word": "TYPHOIDS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "typhoids": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EEGHMNOY",
+                        "words": [
+                            {
+                                "word": "HEGEMONY"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "hegemony": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EFIINST",
+                        "words": [
+                            {
+                                "word": "FINITES"
+                            },
+                            {
+                                "word": "NIFTIES"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "finites": true,
+                        "nifties": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CDEIIPRR",
+                        "words": [
+                            {
+                                "word": "CIRRIPED"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "cirriped": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CDEKLRU",
+                        "words": [
+                            {
+                                "word": "RUCKLED"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "ruckled": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CDFIJOR",
+                        "words": [
+                            {
+                                "word": "FJORDIC"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "fjordic": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ADDEIMOS",
+                        "words": [
+                            {
+                                "word": "SODAMIDE"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "sodamide": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ACGHIMO",
+                        "words": [
+                            {
+                                "word": "OGHAMIC"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "oghamic": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "BDDELMRU",
+                        "words": [
+                            {
+                                "word": "DRUMBLED"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "drumbled": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AELLMRS",
+                        "words": [
+                            {
+                                "word": "SMALLER"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "smaller": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ILNOORSS",
+                        "words": [
+                            {
+                                "word": "ROSINOLS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "rosinols": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "FHIMORSW",
+                        "words": [
+                            {
+                                "word": "FISHWORM"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "fishworm": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EHIMSSWY",
+                        "words": [
+                            {
+                                "word": "WHIMSEYS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "whimseys": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ENOOORSV",
+                        "words": [
+                            {
+                                "word": "OVERSOON"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "oversoon": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CCEHKPSU",
+                        "words": [
+                            {
+                                "word": "CHECKUPS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "checkups": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AAILLLST",
+                        "words": [
+                            {
+                                "word": "LATILLAS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "latillas": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EIKRSST",
+                        "words": [
+                            {
+                                "word": "STRIKES"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "strikes": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CENOORR",
+                        "words": [
+                            {
+                                "word": "CORONER"
+                            },
+                            {
+                                "word": "CROONER"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "coroner": true,
+                        "crooner": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CEEIPRUX",
+                        "words": [
+                            {
+                                "word": "PRECIEUX"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "precieux": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AABIILZZ",
+                        "words": [
+                            {
+                                "word": "ALBIZZIA"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "albizzia": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "BENORRSU",
+                        "words": [
+                            {
+                                "word": "SUBORNER"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "suborner": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AFORTTU",
+                        "words": [
+                            {
+                                "word": "TARTUFO"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "tartufo": true
+                    }
+                }
+            ],
+            "OppQueue": [
+                {
+                    "OrigQuestion": {
+                        "alphagram": "BDELNOSS",
+                        "words": [
+                            {
+                                "word": "BOLDNESS"
+                            },
+                            {
+                                "word": "BONDLESS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "boldness": true,
+                        "bondless": true
+                    }
+                }
+            ],
+            "Dead": false,
+            "Won": false,
+            "Idx": 0,
+            "Solved": 3,
+            "LastStateChange": {
+                "ChangeType": "piecefall",
+                "PayloadNum": 8,
+                "PayloadNum2": 7,
+                "PayloadString": ""
+            }
+        },
+        {
+            "Slots": [
+                null,
+                {
+                    "OrigQuestion": {
+                        "alphagram": "DEENRTUV",
+                        "words": [
+                            {
+                                "word": "VENTURED"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "ventured": true
+                    }
+                },
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AALPSTU",
+                        "words": [
+                            {
+                                "word": "SPATULA"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "spatula": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EEHNORSS",
+                        "words": [
+                            {
+                                "word": "SENHORES"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "senhores": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "CIKKLLO",
+                        "words": [
+                            {
+                                "word": "KILLOCK"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 0,
+                    "AnswerMap": {
+                        "killock": true
+                    }
+                }
+            ],
+            "Queue": [
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EIMORSTT",
+                        "words": [
+                            {
+                                "word": "OMITTERS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "omitters": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AACEILMN",
+                        "words": [
+                            {
+                                "word": "ANALCIME"
+                            },
+                            {
+                                "word": "CALAMINE"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "analcime": true,
+                        "calamine": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ADEEGLNT",
+                        "words": [
+                            {
+                                "word": "DANEGELT"
+                            },
+                            {
+                                "word": "DETANGLE"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "danegelt": true,
+                        "detangle": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AADNOSUV",
+                        "words": [
+                            {
+                                "word": "VANADOUS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "vanadous": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AEEFIRRS",
+                        "words": [
+                            {
+                                "word": "RAREFIES"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "rarefies": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "IMOSTTT",
+                        "words": [
+                            {
+                                "word": "TOMTITS"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "tomtits": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ADEGIRU",
+                        "words": [
+                            {
+                                "word": "GAUDIER"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "gaudier": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "DELLLOOP",
+                        "words": [
+                            {
+                                "word": "LOLLOPED"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "lolloped": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AEIKNSTY",
+                        "words": [
+                            {
+                                "word": "KYANITES"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "kyanites": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AADLNOSV",
+                        "words": [
+                            {
+                                "word": "VANLOADS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "vanloads": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ACEHIMTZ",
+                        "words": [
+                            {
+                                "word": "MECHITZA"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "mechitza": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ADFHSSU",
+                        "words": [
+                            {
+                                "word": "SHADUFS"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "shadufs": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AELOTVY",
+                        "words": [
+                            {
+                                "word": "OVATELY"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "ovately": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "EHILPRSU",
+                        "words": [
+                            {
+                                "word": "PLUSHIER"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "plushier": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ELOPRSY",
+                        "words": [
+                            {
+                                "word": "LEPROSY"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "leprosy": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AAAILRST",
+                        "words": [
+                            {
+                                "word": "SALARIAT"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "salariat": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AIOSSTT",
+                        "words": [
+                            {
+                                "word": "TATSOIS"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "tatsois": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "DILMOOY",
+                        "words": [
+                            {
+                                "word": "DOOMILY"
+                            },
+                            {
+                                "word": "MOODILY"
+                            }
+                        ],
+                        "length": 7
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "doomily": true,
+                        "moodily": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "AGGNOSSY",
+                        "words": [
+                            {
+                                "word": "SYNAGOGS"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "synagogs": true
+                    }
+                },
+                {
+                    "OrigQuestion": {
+                        "alphagram": "ACEERSST",
+                        "words": [
+                            {
+                                "word": "CATERESS"
+                            },
+                            {
+                                "word": "CERASTES"
+                            }
+                        ],
+                        "length": 8
+                    },
+                    "Whose": 1,
+                    "AnswerMap": {
+                        "cateress": true,
+                        "cerastes": true
+                    }
+                }
+            ],
+            "OppQueue": [],
+            "Dead": false,
+            "Won": false,
+            "Idx": 1,
+            "Solved": 3,
+            "LastStateChange": {
+                "ChangeType": "piecefall",
+                "PayloadNum": 1,
+                "PayloadNum2": 0,
+                "PayloadString": ""
+            }
+        }
+    ],
+    "Players": [
+        "us",
+        "bot"
+    ],
+    "QuestionOffset": 50,
+    "SearchCriteria": "eyJzZWFyY2hwYXJhbXMiOlt7InN0cmluZ3ZhbHVlIjp7InZhbHVlIjoiTldMMjMifX0seyJjb25kaXRpb24iOiJMRU5HVEgiLCJtaW5tYXgiOnsibWluIjo3LCJtYXgiOjh9fV19"
+}
