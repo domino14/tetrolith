@@ -1,20 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"image/color"
-	"log"
 	"strconv"
 
 	"github.com/domino14/tetrolith/pkg/game"
-	"github.com/hajimehoshi/ebiten/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-)
-
-var (
-	mplusFaceSource *text.GoTextFaceSource
 )
 
 const (
@@ -26,22 +19,15 @@ var (
 	p1TileColor = color.RGBA{0x44, 0x17, 0xb7, 255}
 	p2TileColor = color.RGBA{0xfd, 0xb7, 0x2b, 255}
 
-	p1TileStroke = color.RGBA{0x49, 0x28, 0x89, 255}
-	p2TileStroke = color.RGBA{0xa5, 0x77, 0x19, 255}
+	p1TileStroke = color.RGBA{0x6c, 0x3d, 0xe7, 255}
+	p2TileStroke = color.RGBA{0xfe, 0xca, 0x62, 255}
 
 	p1TextColor = color.White
 	p2TextColor = color.Black
 )
 
-func init() {
-	s, err := text.NewGoTextFaceSource(bytes.NewReader(fonts.ArcadeN_ttf))
-	if err != nil {
-		log.Fatal(err)
-	}
-	mplusFaceSource = s
-}
-
-func drawPlayerBoard(screen *ebiten.Image, g *game.GameStateManager, bidx int, x, y float64) {
+func drawPlayerBoard(screen *ebiten.Image, g *game.GameStateManager, bidx int, x, y float64, fontSource *text.GoTextFaceSource,
+	queueColor color.RGBA) {
 	// vector.DrawFilledRect(screen, float32(x-5), float32(y-5), 300, 550, color.Black, false)
 	boardWidth := 300
 	boardHeight := 550
@@ -54,17 +40,17 @@ func drawPlayerBoard(screen *ebiten.Image, g *game.GameStateManager, bidx int, x
 	optxt.GeoM.Translate(x, y-30)
 	optxt.ColorScale.ScaleWithColor(ColorConstants["White"])
 	text.Draw(screen, g.Players[bidx], &text.GoTextFace{
-		Source: mplusFaceSource,
+		Source: fontSource,
 		Size:   24,
 	}, optxt)
 
 	optxt2 := &text.DrawOptions{}
-	optxt2.GeoM.Translate(x+190, y-30)
+	optxt2.GeoM.Translate(x+190, y-45)
 	optxt2.ColorScale.ScaleWithColor(ColorConstants["Blue"])
 
 	text.Draw(screen, "Pts:"+strconv.Itoa(board.Solved), &text.GoTextFace{
-		Source: mplusFaceSource,
-		Size:   24,
+		Source: fontSource,
+		Size:   36,
 	}, optxt2)
 
 	for idx, slot := range board.Slots {
@@ -72,7 +58,7 @@ func drawPlayerBoard(screen *ebiten.Image, g *game.GameStateManager, bidx int, x
 			continue
 		}
 		drawAlpha(screen, slot.OrigQuestion.Alphagram, slot.Whose, x, y+float64(idx*(tileSize+2)),
-			len(slot.OrigQuestion.Words))
+			len(slot.OrigQuestion.Words), fontSource)
 	}
 
 	// Draw the opp queue.
@@ -81,16 +67,15 @@ func drawPlayerBoard(screen *ebiten.Image, g *game.GameStateManager, bidx int, x
 	}
 	height := len(board.OppQueue) * (tileSize + 2)
 	vector.DrawFilledRect(screen, float32(x-25), float32(y)+float32(boardHeight-height-4),
-		15, float32(height-4), ColorConstants["Magenta"], false)
+		15, float32(height-4), queueColor, false)
 }
 
-func drawBoard(screen *ebiten.Image, g *game.GameStateManager) {
-	drawPlayerBoard(screen, g, 0, 100, 80)
-	drawPlayerBoard(screen, g, 1, 600, 80)
-
+func drawBoard(screen *ebiten.Image, g *game.GameStateManager, fontSource *text.GoTextFaceSource, queueColor color.RGBA) {
+	drawPlayerBoard(screen, g, 0, 100, 80, fontSource, queueColor)
+	drawPlayerBoard(screen, g, 1, 600, 80, fontSource, queueColor)
 }
 
-func drawAlpha(screen *ebiten.Image, alpha string, pidx int, x, y float64, nsol int) {
+func drawAlpha(screen *ebiten.Image, alpha string, pidx int, x, y float64, nsol int, fontSource *text.GoTextFaceSource) {
 	var bgcolor, textcolor, strokecolor color.Color
 	if pidx == 0 {
 		bgcolor, textcolor, strokecolor = p1TileColor, p1TextColor, p1TileStroke
@@ -99,9 +84,9 @@ func drawAlpha(screen *ebiten.Image, alpha string, pidx int, x, y float64, nsol 
 	}
 
 	for idx, t := range []rune(alpha) {
-		drawNSolChip(screen, x+(tileSize/2), y+(tileSize/2), tileSize/2, nsol)
+		drawNSolChip(screen, x+(tileSize/2), y+(tileSize/2), tileSize/2, nsol, fontSource)
 		tx := x + 5 + float64(tileSize)*float64(idx+1)
-		drawTile(screen, string(t), bgcolor, textcolor, strokecolor, tx, y, tileSize, tileArcRadius)
+		drawTile(screen, string(t), bgcolor, textcolor, strokecolor, tx, y, tileSize, tileArcRadius, fontSource)
 	}
 }
 
@@ -123,7 +108,7 @@ type ChipAttributes struct {
 }
 
 func getChipAttributes(effectiveNumAnagrams int) ChipAttributes {
-	outlineColor := color.RGBA{0x7e, 0x7f, 0x7a, 0xff}
+	outlineColor := ColorConstants["White"]
 	if effectiveNumAnagrams > 9 {
 		effectiveNumAnagrams = 9
 	}
@@ -201,7 +186,7 @@ func getChipAttributes(effectiveNumAnagrams int) ChipAttributes {
 	}
 }
 
-func drawNSolChip(screen *ebiten.Image, cx, cy, radius float64, nsol int) {
+func drawNSolChip(screen *ebiten.Image, cx, cy, radius float64, nsol int, fontSource *text.GoTextFaceSource) {
 
 	if nsol > 9 {
 		nsol = 9
@@ -213,17 +198,17 @@ func drawNSolChip(screen *ebiten.Image, cx, cy, radius float64, nsol int) {
 		ca.outline, false)
 
 	optxt := &text.DrawOptions{}
-	optxt.GeoM.Translate(cx-(radius/2), cy-(radius/2))
+	optxt.GeoM.Translate(cx-(radius/2), cy-(radius/2)-7)
 	optxt.ColorScale.ScaleWithColor(ca.textColor)
 	text.Draw(screen, strconv.Itoa(nsol), &text.GoTextFace{
-		Source: mplusFaceSource,
-		Size:   float64(radius * 1.3),
+		Source: fontSource,
+		Size:   float64(radius * 1.6),
 	}, optxt)
 
 }
 
 func drawTile(screen *ebiten.Image, tch string, tileColor, textColor, tileStrokeColor color.Color,
-	x, y, size, arcradius float64) {
+	x, y, size, arcradius float64, fontSource *text.GoTextFaceSource) {
 	var path vector.Path
 
 	// leave room for outline
@@ -260,11 +245,11 @@ func drawTile(screen *ebiten.Image, tch string, tileColor, textColor, tileStroke
 	screen.DrawTriangles(vst, ist, img, op)
 
 	optxt := &text.DrawOptions{}
-	optxt.GeoM.Translate(float64(x+6), float64(y+5))
+	optxt.GeoM.Translate(float64(x+4), float64(y-3))
 	optxt.ColorScale.ScaleWithColor(textColor)
 	text.Draw(screen, tch, &text.GoTextFace{
-		Source: mplusFaceSource,
-		Size:   float64(size - 8),
+		Source: fontSource,
+		Size:   float64(size - 1),
 	}, optxt)
 
 }
