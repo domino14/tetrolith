@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ebiten Game</title>
+    <script src="wasm_exec.js"></script>
+    <script>
+      const go = new Go();
+      WebAssembly.instantiateStreaming(
+        fetch("main.wasm"),
+        go.importObject
+      ).then((result) => {
+        go.run(result.instance);
+      });
+
+      let ws;
+
+      async function getJwtToken() {
+        try {
+          const response = await fetch("/jwt");
+          if (!response.ok) {
+            throw new Error(
+              "Network response was not ok " + response.statusText
+            );
+          }
+          const data = await response.json();
+          return data.token;
+        } catch (error) {
+          console.error("Error fetching JWT token:", error);
+          return null;
+        }
+      }
+
+      const getSocketURI = () => {
+        const loc = window.location;
+        let protocol;
+        if (loc.protocol === "https:") {
+          protocol = "wss:";
+        } else {
+          protocol = "ws:";
+        }
+        const host = loc.host;
+
+        return `${protocol}//${host}/tetrolith/ws`;
+      };
+
+      async function connectWebSocket() {
+        const jwtToken = await getJwtToken();
+        if (!jwtToken) {
+          console.error("Failed to retrieve JWT");
+          return;
+        }
+
+        const wsUrl = `${getSocketURI()}?token=${jwtToken}`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function () {
+          console.log("WebSocket connection opened.");
+        };
+
+        ws.onmessage = function (event) {
+          const message = event.data;
+          console.log("Received: ", message);
+          // Pass the message to the Go code
+          if (window.receiveMessage) {
+            window.receiveMessage(message);
+          }
+        };
+
+        ws.onclose = function () {
+          console.log("WebSocket connection closed.");
+        };
+
+        ws.onerror = function (error) {
+          console.log("WebSocket error: ", error);
+        };
+      }
+
+      function sendMessage(message) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+        }
+      }
+
+      window.connectWebSocket = connectWebSocket;
+      window.sendMessage = sendMessage;
+    </script>
+  </head>
+  <body>
+    <script>
+      connectWebSocket();
+    </script>
+    <canvas id="canvas" width="1024" height="800"></canvas>
+  </body>
+</html>

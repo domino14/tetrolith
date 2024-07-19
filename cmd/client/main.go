@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
-	"io"
 	"log"
 	"math"
-	"os"
+	"syscall/js"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
@@ -78,8 +77,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	startColor := color.RGBA{0xf4, 0xb0, 0xeb, 255}
 	endColor := color.RGBA{255, 0, 0, 255}
 	queueColor := interpolateColor(t, startColor, endColor)
-
-	drawBoard(screen, g.state, g.fontSource, queueColor)
+	if g.state != nil {
+		drawBoard(screen, g.state, g.fontSource, queueColor)
+	}
 	g.ui.Draw(screen)
 }
 
@@ -106,7 +106,7 @@ func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("Hello, World!")
 
-	g := &Game{state: &game.GameStateManager{}}
+	g := &Game{}
 
 	// load images for button states: idle, hover, and pressed
 	// buttonImage, _ := loadButtonImage()
@@ -168,12 +168,11 @@ func main() {
 		//This is called when the user hits the "Enter" key.
 		//There are other options that can configure this behavior
 		widget.TextInputOpts.SubmitHandler(func(args *widget.TextInputChangedEventArgs) {
-			fmt.Println("Text Submitted: ", args.InputText)
+			js.Global().Call("sendMessage", args.InputText) // Send message to WebSocket
 		}),
 
 		//This is called whenver there is a change to the text
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
-			fmt.Println("Text Changed: ", args.InputText)
 		}),
 	)
 
@@ -186,21 +185,21 @@ func main() {
 	}
 	g.ui = &ui
 
-	f, err := os.Open("./testdata/state.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	bts, err := io.ReadAll(f)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(bts, g.state)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(g.state.Printable())
+	// Register the receiveMessage function in Go
+	js.Global().Set("receiveMessage", js.FuncOf(g.receiveMessage))
 
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// receiveMessage processes messages from the WebSocket
+func (g *Game) receiveMessage(this js.Value, args []js.Value) interface{} {
+	message := args[0].String()
+	// Update game state based on the received message
+	err := json.Unmarshal([]byte(message), g.state)
+	if err != nil {
+		log.Println("Error processing message: ", err)
+	}
+	return nil
 }

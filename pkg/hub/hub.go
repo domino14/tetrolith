@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -56,6 +55,7 @@ type Hub struct {
 
 	gameSessionManager *game.SessionManager
 	gameEventsOut      chan []byte
+	cfg                *config.Config
 }
 
 func NewHub(cfg *config.Config) (*Hub, error) {
@@ -71,6 +71,7 @@ func NewHub(cfg *config.Config) (*Hub, error) {
 		clientsByConnID:    make(map[string]*Client),
 		gameSessionManager: game.NewSessionManager(cfg, gevents),
 		gameEventsOut:      gevents,
+		cfg:                cfg,
 	}, nil
 }
 
@@ -211,7 +212,7 @@ func (h *Hub) socketLogin(c *Client) error {
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return []byte(os.Getenv("SECRET_KEY")), nil
+		return []byte(h.cfg.SecretKey), nil
 	})
 	if err != nil {
 		return err
